@@ -1,0 +1,143 @@
+clc;
+close all;
+clear all;
+
+%Elements +- 0.05
+Por = 0.1440;   
+Sil = 0.9526;
+SilC = 0.7638; 
+Grap = 0.4;
+
+data = xlsread('TrainingSet.xlsx');
+
+Input = data(2:end,:);
+Output = rmmissing(data(1,:));
+
+for i= 1:1:size(Input,2)
+
+    In = Input(:,0+i);
+    
+Por = find(In < 0.5 );
+Sil = find(In > 0.85);
+SilC = find(In > 0.5 & In < 0.85 );
+
+PercPor(i) = (size(Por,1)/size(In,1))*100;
+PercSil(i) = (size(Sil,1)/size(In,1))*100;
+PercSilC(i) = (size(SilC,1)/size(In,1))*100;
+        
+end
+
+ProcessedData = [PercPor' PercSil' PercSilC'];
+
+plot3(ProcessedData(1:24,1),ProcessedData(1:24,2),ProcessedData(1:24,3),'rx');
+xlabel('Porosity (%)'); ylabel('Silicon (%) ');,zlabel('SiliconCarbide (%)')
+grid on;
+hold on;
+plot3(ProcessedData(25:end,1),ProcessedData(25:end,2),ProcessedData(25:end,3),'kx');
+legend ('Bad','Good')
+hold off;
+
+plot(ProcessedData(1:24,1),ProcessedData(1:24,2),'rx')
+hold on;
+plot(ProcessedData(25:end,1),ProcessedData(25:end,2),'kx')
+xlabel('Porosity (%)')
+ylabel('Silicon (%)')
+% legend('Bad','Good')
+
+
+Machine Learning
+
+y = Output';
+x = ProcessedData;
+[m, n] = size(x);
+x = [ones(m, 1) x];
+theta = zeros(n + 1, 1);
+
+x1 = ProcessedData(:,1);
+x2 = ProcessedData(:,2);
+x3 = ProcessedData(:,3);
+
+x = [ones(size(x1,1),1) x1 x2];
+
+
+theta = zeros(size(x, 2), 1);
+[J, grad] = costFunction(theta, x, y);
+disp(J);
+disp(grad);
+options = optimoptions(@fminunc,'Algorithm','Quasi-Newton','GradObj', 'on', 'MaxIter', 4000);
+[opt_theta, cost] = fminunc(@(t)(costFunction(t, x, y)), theta, options);
+
+plot(ProcessedData(1:24,1),ProcessedData(1:24,2),'rx')
+hold on;
+plot(ProcessedData(25:end,1),ProcessedData(25:end,2),'kx')
+xlabel('Porosity (%)')
+ylabel('Silicon (%)')
+legend('Bad','Good')
+u = linspace(0,30,50);
+v = linspace(0,10,50);
+    z = zeros(length(u), length(v));
+
+    for i = 1:length(u)
+        for j = 1:length(v)
+            z(i,j) = [1 u(i) v(j)] *opt_theta;
+               end
+    end
+  z = z';
+      contour(u, v, z, [0, 0], 'b','LineWidth', 2)
+hold on;
+
+
+Testing
+dataT = xlsread('TestingSet.xlsx');
+
+InputT = dataT(2:end,:);
+OutputT = dataT(1,:);
+
+for j= 1:1:size(InputT,2)
+
+    InT = InputT(:,0+j);
+    
+PorT = find(InT < 0.5 );
+SilT = find(InT > 0.85);
+% SilCT = find(InT > 0.7 & SilCT < 0.85 );
+
+PercPorT(j) = (size(PorT,1)/size(InT,1))*100;
+PercSilT(j) = (size(SilT,1)/size(InT,1))*100;
+% PercSilCT(j) = (size(SilCT,1)/size(InT,1))*100;
+        
+end
+
+TestingData = [ PercPorT' PercSilT'];
+Test = [ones(size(TestingData,1),1) TestingData];
+PredT = round(sigmoid(Test*opt_theta));
+
+plot(TestingData(1:7,1),TestingData(1:7,2),'bx','LineWidth',2)
+plot(TestingData(8:14,1),TestingData(8:14,2),'gx','LineWidth',2)
+Accuracy = find(PredT == OutputT');
+Accuracy = (size(Accuracy,1)/size(OutputT,2))*100
+
+
+
+Prediction
+Sample = imread("Test2G.jpg");
+Sample = im2double(Sample);
+x1 = Sample(:,:,1);x2 = Sample(:,:,2);x3 = Sample(:,:,3);Sample = (x1+x2+x3)/3;
+Sample = imresize(Sample, [192 256]);
+Sample = Sample(:);
+
+Por = find(Sample < 0.5 );
+Sil = find(Sample > 0.85);
+% SilC = find(Sample > 0.7 & Sample < 0.85 );
+
+PercPor = (size(Por,1)/size(Sample,1))*100;
+PercSil = (size(Sil,1)/size(Sample,1))*100;
+% PercSilC = (size(SilC,1)/size(Sample,1))*100;
+
+Sample = [ 1 PercPor PercSil];
+Pred = round(sigmoid(Sample * opt_theta));
+
+if Pred == 1
+    fprintf('Passed')
+else
+    fprintf('Failed')
+end
